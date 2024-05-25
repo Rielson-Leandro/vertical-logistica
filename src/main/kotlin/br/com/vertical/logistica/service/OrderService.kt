@@ -4,10 +4,8 @@ import br.com.vertical.logistica.entity.OrderEntity
 import br.com.vertical.logistica.entity.Product
 import br.com.vertical.logistica.entity.User
 import br.com.vertical.logistica.repository.UserRepository
-import org.springframework.data.crossstore.ChangeSetPersister
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
-import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -23,17 +21,22 @@ class OrderService(private val userRepository: UserRepository) {
                 val user = order.user
                 val userId = user.id
 
-                val userMap = ordersByUser.getOrPut(userId) { mutableMapOf("user" to user, "orders" to mutableListOf<Map<String, Any>>()) }
+                val userMap = ordersByUser.getOrPut(userId) {
+                    mutableMapOf(
+                        "user" to user,
+                        "orders" to mutableListOf<Map<String, Any>>()
+                    )
+                }
                 val ordersList = userMap["orders"] as MutableList<Map<String, Any>>
 
                 val orderMap = mutableMapOf<String, Any>(
                     "order_id" to order.id,
-                    "total" to order.calculateTotal().toString(), // Converting BigDecimal to String
-                    "date" to order.date.toString(), // Converting LocalDate to String
+                    "total" to order.total.toString(),
+                    "date" to order.date.toString(),
                     "products" to order.products.map { product ->
                         mapOf(
                             "product_id" to product.id,
-                            "value" to product.productValue.toString() // Converting BigDecimal to String
+                            "value" to product.productValue.toString()
                         )
                     }
                 )
@@ -41,7 +44,6 @@ class OrderService(private val userRepository: UserRepository) {
             }
         }
 
-        // Salvando todos os usuários e pedidos após o processamento do arquivo
         val usersToSave = ordersByUser.values.map { it["user"] as User }
         userRepository.saveAll(usersToSave)
 
@@ -84,7 +86,7 @@ class OrderService(private val userRepository: UserRepository) {
                 user.orderEntities.add(order)
             }
             order.calculateTotal()
-            order // Retorna a ordem processada
+            order
         } catch (e: Exception) {
             // logger.error("Error parsing line: $line, ${e.message}")
             null

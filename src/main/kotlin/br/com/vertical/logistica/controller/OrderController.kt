@@ -1,7 +1,5 @@
 package br.com.vertical.logistica.controller
 
-import br.com.vertical.logistica.entity.OrderEntity
-import br.com.vertical.logistica.entity.User
 import br.com.vertical.logistica.service.OrderService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*

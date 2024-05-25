@@ -18,20 +18,13 @@ data class OrderEntity(
     @OneToMany(mappedBy = "orderEntity", cascade = [CascadeType.ALL], orphanRemoval = true)
     val products: MutableList<Product> = mutableListOf()
 ) {
+    var total: BigDecimal = BigDecimal.ZERO
+    private set
+
     fun calculateTotal(): BigDecimal {
-        var total = BigDecimal.ZERO
-        for (product in products) {
-            total += product.productValue
+        total = products.fold(BigDecimal.ZERO) { acc, product ->
+            acc + product.productValue
         }
         return total
-    }
-
-    // Definindo a propriedade total como var para permitir a atualização
-    var total: BigDecimal = BigDecimal.ZERO
-        private set
-
-    // Método para retornar o total formatado como uma string
-    fun getTotalAsString(): String {
-        return total.toString()
     }
 }
