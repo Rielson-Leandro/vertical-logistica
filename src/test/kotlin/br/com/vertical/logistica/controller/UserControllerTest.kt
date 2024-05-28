@@ -29,7 +29,7 @@ class UserControllerTest {
     fun `getAllOrdersByUsers should return list of users with orders when parameters are valid`() {
         val initDate = "2023-01-01"
         val finishDate = "2023-12-31"
-        val usersWithOrders = listOf(UserDTO(1, "John Doe", listOf(OrderDTO(1, "100.00", "2023-01-01", listOf(ProductDTO(1, "50.00"))))))
+        val usersWithOrders = listOf(UserDTO(1, "John Doe", mutableListOf(OrderDTO(1, "100.00", "2023-01-01", mutableListOf(ProductDTO(1, "50.00"))))))
 
         whenever(userService.areDatesValid(initDate, finishDate)).thenReturn(true)
         whenever(userService.getAllUsersWithOrders(initDate, finishDate)).thenReturn(usersWithOrders)
@@ -57,7 +57,7 @@ class UserControllerTest {
     @Test
     fun `getUserByOrderId should return user by order ID`() {
         val orderId = 1L
-        val user = UserDTO(1, "John Doe", listOf(OrderDTO(1, "100.00", "2023-01-01", listOf(ProductDTO(1, "50.00")))))
+        val user = UserDTO(1, "John Doe", mutableListOf(OrderDTO(1, "100.00", "2023-01-01", mutableListOf(ProductDTO(1, "50.00")))))
 
         whenever(userService.getByOrderId(orderId)).thenReturn(user)
 
