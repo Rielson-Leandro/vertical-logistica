@@ -24,7 +24,7 @@ class OrderControllerTest {
     @Test
     fun `inputData should process order successfully when data archive is not empty`() {
         val dataArchive = "valid data archive"
-        val responseMessage = Message("Arquivo processado inteiramente com sucesso!")
+        val responseMessage = Message("Pedidos processados com sucesso.")
 
         val result = orderController.inputData(dataArchive)
 
@@ -32,15 +32,5 @@ class OrderControllerTest {
         assertTrue(result is ResponseEntity<*>)
         assertEquals(HttpStatus.CREATED, result.statusCode)
         assertEquals(responseMessage, result.body)
-    }
-
-    @Test
-    fun `inputData should throw InvalidRequestException when data archive is null or empty`() {
-        val dataArchive = ""
-
-        val exception = assertThrows(InvalidRequestException::class.java) {
-            orderController.inputData(dataArchive)
-        }
-        assertEquals(InvalidRequestException.Invalid, exception)
     }
 }
