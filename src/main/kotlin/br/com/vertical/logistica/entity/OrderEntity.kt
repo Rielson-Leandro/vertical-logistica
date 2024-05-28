@@ -1,30 +1,25 @@
-package br.com.vertical.logistica.entity
+    package br.com.vertical.logistica.entity
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.annotation.JsonManagedReference
-import java.math.BigDecimal
-import java.time.LocalDate
-import javax.persistence.*
+    import com.fasterxml.jackson.annotation.JsonIgnore
+    import java.math.BigDecimal
+    import java.time.LocalDate
+    import javax.persistence.*
+    import javax.validation.constraints.NotNull
 
-@Entity
-@JsonIgnoreProperties("user")
-data class OrderEntity(
-    @Id
-    val id: Long,
-    val date: LocalDate,
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    val user: User,
-    @OneToMany(mappedBy = "orderEntity", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val products: MutableList<Product> = mutableListOf()
-) {
-    var total: BigDecimal = BigDecimal.ZERO
-    private set
-
-    fun calculateTotal(): BigDecimal {
-        total = products.fold(BigDecimal.ZERO) { acc, product ->
-            acc + product.productValue
-        }
-        return total
-    }
-}
+    @Entity
+    data class OrderEntity(
+        @Id
+        val id: Long? = null,
+        @field:NotNull
+        val date: LocalDate? = null,
+        @ManyToOne
+        @JoinColumn(name = "user_id")
+        @JsonIgnore
+        val user: UserEntity? = null,
+        @field:NotNull
+        var total: BigDecimal? = null,
+        @ElementCollection
+        @CollectionTable(name = "Order_products", joinColumns = [JoinColumn(name = "order_id")])
+        @Embedded
+        val products: MutableList<ProductEntity> = mutableListOf(),
+    )

@@ -1,6 +1,11 @@
 package br.com.vertical.logistica.controller
 
+import br.com.vertical.logistica.entity.Message
+import br.com.vertical.logistica.exceptions.InvalidRequestException
 import br.com.vertical.logistica.service.OrderService
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -8,13 +13,15 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/orders")
 class OrderController(private val orderService: OrderService) {
 
-    @PostMapping("/upload")
-    fun uploadFile(@RequestBody fileContent: String): ResponseEntity<List<Map<String, Any>>> {
-        return orderService.processLegacyFile(fileContent)
-    }
+    private val logger: Logger = LoggerFactory.getLogger(OrderController::class.java)
 
-//    @GetMapping("/{userId}")
-//    fun getUserOrders(@PathVariable userId: Long): List<User> {
-//        return orderService.getUserOrders(userId)
-//    }
+    @PostMapping
+    fun inputData(@RequestBody fileString: String): ResponseEntity<Message> {
+        val file = fileString ?: throw InvalidRequestException.Invalid
+        val resp = orderService.processOrder(file)
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            Message("Pedidos processados com sucesso.")
+        )
+    }
 }

@@ -1,95 +1,116 @@
 package br.com.vertical.logistica.service
 
 import br.com.vertical.logistica.entity.OrderEntity
-import br.com.vertical.logistica.entity.Product
-import br.com.vertical.logistica.entity.User
+import br.com.vertical.logistica.entity.ProductEntity
+import br.com.vertical.logistica.entity.UserEntity
+import br.com.vertical.logistica.helpers.ProcessDataHelper.getOrderDateAndId
+import br.com.vertical.logistica.helpers.ProcessDataHelper.getOrderIdAndDate
+import br.com.vertical.logistica.helpers.ProcessDataHelper.getProductIdAndValue
+import br.com.vertical.logistica.helpers.ProcessDataHelper.getProductValueAndId
+import br.com.vertical.logistica.helpers.ProcessDataHelper.getUserIdAndName
+import br.com.vertical.logistica.helpers.ProcessDataHelper.getUserNameAndId
+import br.com.vertical.logistica.helpers.ProcessDataHelper.isLineIsValid
+import br.com.vertical.logistica.repository.OrderRepository
 import br.com.vertical.logistica.repository.UserRepository
-import org.springframework.http.ResponseEntity
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Service
-class OrderService(private val userRepository: UserRepository) {
+class OrderService(
+    private val userRepository: UserRepository,
+    private val orderRepository: OrderRepository
+) {
 
-    fun processLegacyFile(fileContent: String): ResponseEntity<List<Map<String, Any>>> {
-        val ordersByUser = mutableMapOf<Long, MutableMap<String, Any>>()
+    companion object {
+        private val LOGGER: Logger = LoggerFactory.getLogger(OrderService::class.java)
+        private const val YYYYMMDD: String = "yyyyMMdd"
 
-        fileContent.lines().forEach { line ->
-            val order = processLine(line)
-            if (order != null) {
-                val user = order.user
-                val userId = user.id
+    }
 
-                val userMap = ordersByUser.getOrPut(userId) {
-                    mutableMapOf(
-                        "user" to user,
-                        "orders" to mutableListOf<Map<String, Any>>()
-                    )
-                }
-                val ordersList = userMap["orders"] as MutableList<Map<String, Any>>
+    @Transactional
+    fun processOrder(fileString: String): List<String> {
+        val (errorLines, usersToPersist, ordersToPersist) = mutableListOf<String>().let {
+            Triple(it, mutableListOf<UserEntity>(), mutableListOf<OrderEntity>())
+        }
 
-                val orderMap = mutableMapOf<String, Any>(
-                    "order_id" to order.id,
-                    "total" to order.total.toString(),
-                    "date" to order.date.toString(),
-                    "products" to order.products.map { product ->
-                        mapOf(
-                            "product_id" to product.id,
-                            "value" to product.productValue.toString()
-                        )
-                    }
-                )
-                ordersList.add(orderMap)
+        fileString.lineSequence().forEach { line ->
+            if (isLineIsValid(line)) {
+                processLineToEntities(line, usersToPersist, ordersToPersist, errorLines)
+            } else {
+                errorLines.add(line)
             }
         }
 
-        val usersToSave = ordersByUser.values.map { it["user"] as User }
-        userRepository.saveAll(usersToSave)
+        persistAndMergeOrders(usersToPersist, ordersToPersist)
 
-        val responseList = ordersByUser.values.map { it }
-        return ResponseEntity.ok(responseList.toList())
+        return errorLines
     }
 
-    private fun processLine(line: String?): OrderEntity? {
-        if (line == null || line.isEmpty()) return null
+    private fun processLineToEntities(
+        line: String,
+        usersToPersist: MutableList<UserEntity>,
+        ordersToPersist: MutableList<OrderEntity>,
+        errorLines: MutableList<String>
+    ) {
+        val (userId, userName) = getUserIdAndName(line) to getUserNameAndId(line)
+        val (orderId, orderStrDate) = getOrderIdAndDate(line) to getOrderDateAndId(line)
+        val (productId, productValue) = getProductIdAndValue(line) to getProductValueAndId(line)
 
-        return try {
-            val userId = line.substring(0, 10).trim().toLong()
-            val userName = line.substring(10, 55).trim()
-            val orderId = line.substring(55, 65).trim().toLong()
-            val productId = line.substring(65, 75).trim().toLong()
-            val value = line.substring(75, 87).trim().toBigDecimal()
-            val date = LocalDate.parse(line.substring(87, 95).trim(), DateTimeFormatter.ofPattern("yyyyMMdd"))
+        if (listOf(userId, userName, orderId, orderStrDate, productId, productValue).any { it == null }) {
+            errorLines.add(line)
+            return
+        }
 
-            val user = userRepository.findById(userId).orElseGet {
-                User(id = userId, name = userName)
-            }
+        val newUser = usersToPersist.find { it.id == userId } ?: UserEntity(userId, userName, mutableListOf()).also {
+            usersToPersist.add(it)
+        }
+        val existingOrder = ordersToPersist.find { it.id == orderId }
 
-            var order = user.orderEntities.find { it.id == orderId }
-            if (order != null) {
-                val existingProduct = order.products.find { it.id == productId }
-                if (existingProduct != null) {
-                    // logger.warn("Duplicate product ($productId) found in order (${order.id}) for user ($userId)")
-                } else {
-                    val product = Product(id = productId, productValue = value, orderEntity = order)
-                    order.products.add(product)
-                }
-            } else {
-                order = OrderEntity(
-                    id = orderId,
-                    user = user,
-                    date = date
+        existingOrder?.products?.add(ProductEntity(productId, productValue))
+            ?: run {
+                val newOrder = OrderEntity(
+                    orderId,
+                    LocalDate.parse(orderStrDate, DateTimeFormatter.ofPattern(YYYYMMDD)),
+                    newUser,
+                    BigDecimal.ZERO,
+                    mutableListOf()
                 )
-                val product = Product(id = productId, productValue = value, orderEntity = order)
-                order.products.add(product)
-                user.orderEntities.add(order)
+                newOrder.products.add(ProductEntity(productId, productValue))
+                ordersToPersist.add(newOrder)
             }
-            order.calculateTotal()
-            order
-        } catch (e: Exception) {
-            // logger.error("Error parsing line: $line, ${e.message}")
-            null
+    }
+
+    @Transactional
+    private fun persistAndMergeOrders(newUserList: List<UserEntity>, newOrderList: List<OrderEntity>) {
+        val userPersistList = newUserList.filter { user ->
+            userRepository.findById(user.id!!).isEmpty
+        }
+        userRepository.saveAll(userPersistList)
+
+        val orderPersistList = newOrderList.map { newOrder ->
+            val existingOrder = orderRepository.findById(newOrder.id!!)
+            if (existingOrder.isPresent) {
+                existingOrder.get().apply { products.addAll(newOrder.products) }
+            } else {
+                newOrder
+            }
+        }
+
+        orderPersistList.forEach { order ->
+            order.total = totalCalculate(order.products)
+        }
+
+        orderRepository.saveAll(orderPersistList)
+    }
+
+    private fun totalCalculate(products: List<ProductEntity>): BigDecimal {
+        return products.fold(BigDecimal.ZERO) { acc, product ->
+            acc + (product.productValue ?: BigDecimal.ZERO)
         }
     }
 }
