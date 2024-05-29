@@ -3,13 +3,7 @@ package br.com.vertical.logistica.service
 import br.com.vertical.logistica.entity.OrderEntity
 import br.com.vertical.logistica.entity.ProductEntity
 import br.com.vertical.logistica.entity.UserEntity
-import br.com.vertical.logistica.helpers.ProcessDataHelper.getOrderDateAndId
-import br.com.vertical.logistica.helpers.ProcessDataHelper.getOrderIdAndDate
-import br.com.vertical.logistica.helpers.ProcessDataHelper.getProductIdAndValue
-import br.com.vertical.logistica.helpers.ProcessDataHelper.getProductValueAndId
-import br.com.vertical.logistica.helpers.ProcessDataHelper.getUserIdAndName
-import br.com.vertical.logistica.helpers.ProcessDataHelper.getUserNameAndId
-import br.com.vertical.logistica.helpers.ProcessDataHelper.isLineIsValid
+import br.com.vertical.logistica.utils.ProcessedLine
 import br.com.vertical.logistica.repository.OrderRepository
 import br.com.vertical.logistica.repository.UserRepository
 import org.slf4j.Logger
@@ -39,10 +33,12 @@ class OrderService(
         }
 
         fileString.lineSequence().forEach { line ->
-            if (isLineIsValid(line)) {
-                processLineToEntities(line, usersToPersist, ordersToPersist, errorLines)
-            } else {
+            val processedLine = ProcessedLine.from(line)
+            if (processedLine == null) {
                 errorLines.add(line)
+
+            } else {
+                processLineToEntities(processedLine, usersToPersist, ordersToPersist, errorLines)
             }
         }
 
@@ -52,17 +48,15 @@ class OrderService(
     }
 
     private fun processLineToEntities(
-        line: String,
+        processedLine: ProcessedLine,
         usersToPersist: MutableList<UserEntity>,
         ordersToPersist: MutableList<OrderEntity>,
         errorLines: MutableList<String>
     ) {
-        val (userId, userName) = getUserIdAndName(line) to getUserNameAndId(line)
-        val (orderId, orderStrDate) = getOrderIdAndDate(line) to getOrderDateAndId(line)
-        val (productId, productValue) = getProductIdAndValue(line) to getProductValueAndId(line)
+        val (userId, userName, orderId, productId, productValue, orderStrDate) = processedLine
 
         if (listOf(userId, userName, orderId, orderStrDate, productId, productValue).any { it == null }) {
-            errorLines.add(line)
+            errorLines.add(processedLine.toString())
             return
         }
 
