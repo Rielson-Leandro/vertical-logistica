@@ -7,16 +7,19 @@ import br.com.vertical.logistica.entity.OrderEntity
 import br.com.vertical.logistica.entity.ProductEntity
 import br.com.vertical.logistica.entity.UserEntity
 import br.com.vertical.logistica.exceptions.OrderNotFoundException
-import br.com.vertical.logistica.mappers.OrderResponseMapper.convertToOrderDTO
+import br.com.vertical.logistica.utils.OrderResponse.convertToOrderDTO
 import br.com.vertical.logistica.repository.OrderRepository
 import br.com.vertical.logistica.repository.UserRepository
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.cache.annotation.CacheConfig
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Service
+@CacheConfig(cacheNames = ["users", "orders"])
 class UserService(
     private val ordersRepository: OrderRepository,
     private val usersRepository: UserRepository
@@ -27,6 +30,7 @@ class UserService(
         private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     }
 
+    @Cacheable(cacheNames = ["allUsersWithOrders"], key = "#initDate?.hashCode()?.toString()?.plus('-')?.plus(#finishDate?.hashCode()?.toString())")
     fun getAllUsersWithOrders(initDate: String?, finishDate: String?): List<UserDTO> {
         val consultedUsers = usersRepository.findAll()
 
@@ -43,6 +47,7 @@ class UserService(
         }
     }
 
+    @Cacheable(value = ["order"])
     fun getByOrderId(orderId: Long): UserDTO? {
         val order = ordersRepository.findById(orderId)
             .orElseThrow {

@@ -26,8 +26,10 @@
 		implementation("org.jetbrains.kotlin:kotlin-reflect:1.6.21")
 		implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.6.21")
 		implementation("javax.validation:validation-api:2.0.1.Final")
+		implementation("org.postgresql:postgresql:42.7.3")
+		implementation("org.springframework.boot:spring-boot-starter-data-redis")
+		implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.0.0")
 
-		runtimeOnly("com.h2database:h2")
 		testImplementation("org.springframework.boot:spring-boot-starter-test")
 		testImplementation("org.mockito.kotlin:mockito-kotlin:3.2.0")
 		testImplementation ("org.mockito:mockito-core:3.2.0")
@@ -46,4 +48,8 @@
 
 	tasks.withType<Test> {
 		useJUnitPlatform()
+	}
+
+	tasks.bootJar {
+		enabled = true
 	}
